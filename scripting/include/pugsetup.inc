@@ -18,6 +18,15 @@ enum MapType {
   MapType_Veto,
 };
 
+// How to determine sides (knife, sides or none, which allows pick or vote)
+enum SidesRound {
+  SidesRound_None,
+  SidesRound_Knife,
+  SidesRound_Deagle,
+  SidesRound_Scout,
+  SidesRound_Grenades
+};
+
 // Permission checking values.
 enum Permission {
   Permission_All,       // anyone can use the command
@@ -35,8 +44,8 @@ enum GameState {
   GameState_PickingPlayers,                // only used if TeamType_Captains is the teamtype
   GameState_WaitingForStart,               // waiting for a .start if autolive is disabled
   GameState_Countdown,                     // doing the countdown timer
-  GameState_KnifeRound,                    // in the knife round
-  GameState_WaitingForKnifeRoundDecision,  // waiting for a .stay/.swap command after the knife
+  GameState_SidesRound,                    // in the sides round
+  GameState_WaitingForSidesRoundDecision,  // waiting for a .stay/.swap command after the sides round
                                            // round
   GameState_GoingLive,                     // in the lo3 process
   GameState_Live,                          // the match is live
@@ -46,6 +55,9 @@ enum ChatAliasMode {
   ChatAlias_Always,     // Alias is always enabled
   ChatAlias_WhenSetup,  // Alias is only available when game state is not GameState_None
 };
+
+int const_GameModeWingman = 2;
+int const_GameModeCompetitive = 1;
 
 /**
  * Called when a setup menu is opened.
@@ -211,18 +223,18 @@ native bool PugSetup_ClearTeamBalancer();
 // Sets a game up with the given settings.
 native void PugSetup_SetupGame(TeamType teamType, MapType mapType = MapType_Vote,
                                int playersPerTeam = 5, bool recordDemo = false,
-                               bool knifeRound = false, bool autoLive = true);
+                               SidesRound sidesRound = SidesRound_None, bool autoLive = true, bool friendlyFire = true);
 
 // Sets the current game options. These can still be overwritten by a user with access to the .setup
 // menu.
 native void PugSetup_SetSetupOptions(TeamType teamType, MapType mapType, int playersPerTeam = 5,
-                                     bool recordDemo = false, bool knifeRound = false,
-                                     bool autoLive = true);
+                                     bool recordDemo = false, SidesRound sidesRound = SidesRound_None,
+                                     bool autoLive = true, bool friendlyFire = true);
 
 // Fetches the current game options.
 // @error If there is no game setup yet.
 native void PugSetup_GetSetupOptions(TeamType& teamType, MapType& mapType, int& playersPerTeam,
-                                     bool& recordDemo, bool& knifeRound, bool& autoLive);
+                                     bool& recordDemo, SidesRound& sidesRound = SidesRound_None, bool& autoLive, bool& friendlyFire);
 
 // Readies up a player, optionally printing chat messages
 // to the client about readying up.

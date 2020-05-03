@@ -67,11 +67,15 @@ public int Native_SetupGame(Handle plugin, int numParams) {
   }
 
   if (numParams >= 5) {
-    g_DoKnifeRound = GetNativeCell(5);
+    g_SidesRound = view_as<SidesRound>(GetNativeCell(5));
   }
 
   if (numParams >= 6) {
     g_AutoLive = GetNativeCell(6);
+  }
+
+  if (numParams >= 7) {
+    g_FriendlyFire = GetNativeCell(7);
   }
 
   SetupFinished();
@@ -86,8 +90,9 @@ public int Native_GetSetupOptions(Handle plugin, int numParams) {
   SetNativeCellRef(2, g_MapType);
   SetNativeCellRef(3, g_PlayersPerTeam);
   SetNativeCellRef(4, g_RecordGameOption);
-  SetNativeCellRef(5, g_DoKnifeRound);
+  SetNativeCellRef(5, g_SidesRound);
   SetNativeCellRef(6, g_AutoLive);
+  SetNativeCellRef(7, g_FriendlyFire);
 }
 
 public int Native_SetSetupOptions(Handle plugin, int numParams) {
@@ -95,8 +100,9 @@ public int Native_SetSetupOptions(Handle plugin, int numParams) {
   g_MapType = view_as<MapType>(GetNativeCell(2));
   g_PlayersPerTeam = GetNativeCell(3);
   g_RecordGameOption = GetNativeCell(4);
-  g_DoKnifeRound = GetNativeCell(5);
+  g_SidesRound = GetNativeCell(5);
   g_AutoLive = GetNativeCell(6);
+  g_FriendlyFire = GetNativeCell(7);
 }
 
 public int Native_ReadyPlayer(Handle plugin, int numParams) {
@@ -325,9 +331,10 @@ public int Native_MessageToAll(Handle plugin, int numParams) {
   char buffer[1024];
   int bytesWritten = 0;
 
-  for (int i = 0; i <= MaxClients; i++) {
-    if (i != 0 && (!IsClientConnected(i) || !IsClientInGame(i)))
-      continue;
+  for (int i = 1; i <= MaxClients; i++) {
+    if (!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
+        continue;
+    }
 
     SetGlobalTransTarget(i);
     FormatNativeString(0, 1, 2, sizeof(buffer), bytesWritten, buffer);

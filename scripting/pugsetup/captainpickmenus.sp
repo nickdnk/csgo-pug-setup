@@ -5,7 +5,7 @@ int g_PickCounter = 0;
 public Action Timer_InitialChoiceMenu(Handle timer) {
   int client = g_capt1;
 
-  if (!g_DoKnifeRound) {
+  if (!g_SidesRound) {
     // if no knife rounds, they get to choose between side/1st pick
     Menu menu = new Menu(InitialChoiceHandler);
     SetMenuTitle(menu, "%T", "InitialPickTitle", client);
@@ -141,6 +141,7 @@ public int PlayerMenuHandler(Menu menu, MenuAction action, int param1, int param
 
       if (!IsPickingFinished()) {
         MoreMenuPicks(GetNextCaptain(client));
+        ShowPickMessage();
       } else {
         CreateTimer(1.0, FinishPicking);
       }
@@ -176,11 +177,6 @@ static bool IsPickingFinished() {
   }
 
   return numSelected >= 2 * g_PlayersPerTeam;
-}
-
-static bool IsPlayerPicked(int client) {
-  int team = g_Teams[client];
-  return team == CS_TEAM_T || team == CS_TEAM_CT;
 }
 
 static int GetNextCaptain(int captain) {

@@ -78,11 +78,11 @@ stock bool RemoveChatAliasFromFile(const char[] alias) {
 /**
  * Dealing with the setup options config file.
  */
-static char g_SetupKeys[][] = {"maptype",  "teamtype", "autolive",  "kniferound",
-                               "teamsize", "record",   "mapchange", "playout"};
+static char g_SetupKeys[][] = {"maptype",  "teamtype", "autolive",  "sidesround",
+                               "teamsize", "record",   "mapchange", "playout", "friendly_fire"};
 static char g_SetupCoercions[][][] = {
     {"map", "maptype"},         {"teams", "teamtype"},   {"team", "teamtype"},
-    {"knife", "kniferound"},    {"autolo3", "autolive"}, {"demo", "record"},
+    {"sides", "sidesround"},    {"autolo3", "autolive"}, {"demo", "record"},
     {"changemap", "mapchange"}, {"aim", "aimwarmup"},    {"aimmap", "aimwarmup"},
 };
 
@@ -145,12 +145,20 @@ stock bool CheckSetupOptionValidity(int client, char[] setting, const char[] val
 
     return true;
 
-  } else if (StrEqual(setting, "kniferound", false)) {
-    if (setDisplay)
-      g_DisplayKnifeRound = CheckEnabledFromString(value);
-    if (setDefault)
-      g_DoKnifeRound = CheckEnabledFromString(value);
+  } else if (StrEqual(setting, "sidesround", false)) {
 
+    if (setDefault && !StrEqual(value, "none") && !StrEqual(value, "knife") &&
+        !StrEqual(value, "deagle") && !StrEqual(value, "scout") && !StrEqual(value, "grenades")) {
+      PugSetup_Message(
+          client, "%s is not a valid option for setting %s, valid options are: none, knife, deagle, scout, grenades.",
+          value, setting);
+      return false;
+    } else if (setDefault) {
+      SidesRoundFromString(value, g_SidesRound);
+    }
+
+    if (setDisplay)
+      g_DisplaySidesRound = CheckEnabledFromString(value);
     return true;
 
   } else if (StrEqual(setting, "teamsize", false)) {
@@ -172,6 +180,13 @@ stock bool CheckSetupOptionValidity(int client, char[] setting, const char[] val
       g_DisplayRecordDemo = CheckEnabledFromString(value);
     if (setDefault)
       g_RecordGameOption = CheckEnabledFromString(value);
+    return true;
+
+  } else if (StrEqual(setting, "friendly_fire", false)) {
+    if (setDefault)
+      g_FriendlyFire = CheckEnabledFromString(value);
+    if (setDisplay)
+      g_DisplayFriendlyFire = CheckEnabledFromString(value);
     return true;
 
   } else if (StrEqual(setting, "mapchange", false)) {
@@ -231,13 +246,18 @@ stock void ReadSetupOptions() {
         g_AutoLive = CheckEnabledFromString(buffer);
         g_DisplayAutoLive = display;
 
-      } else if (StrEqual(setting, "kniferound", false)) {
+      } else if (StrEqual(setting, "sidesround", false)) {
+        kv.GetString("default", buffer, sizeof(buffer), "none");
+        SidesRoundFromString(buffer, g_SidesRound, true);
+        g_DisplaySidesRound = display;
+
+      } else if (StrEqual(setting, "friendly_fire", false)) {
         kv.GetString("default", buffer, sizeof(buffer), "0");
-        g_DoKnifeRound = CheckEnabledFromString(buffer);
-        g_DisplayKnifeRound = display;
+        g_FriendlyFire = CheckEnabledFromString(buffer);
+        g_DisplayFriendlyFire = display;
 
       } else if (StrEqual(setting, "teamsize", false)) {
-        g_PlayersPerTeam = kv.GetNum("default", 5);
+        g_PlayersPerTeam = GetGameMode() == const_GameModeWingman ? 2 : 5; // default players to 5 for 5v5 and 2 for wingman depending on game mode
         g_DisplayTeamSize = display;
 
       } else if (StrEqual(setting, "record", false)) {

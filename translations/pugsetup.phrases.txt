@@ -8,6 +8,14 @@
 	{
 		"en"		"Map type"
 	}
+	"GameTypeOption"
+	{
+		"en"		"Game mode"
+	}
+	"FriendlyFireOption"
+	{
+		"en"		"Friendly fire"
+	}
 	"TeamTypeOption"
 	{
 		"en"		"Team type"
@@ -36,20 +44,54 @@
 	{
 		"en"		"The game is already live!"
 	}
+	"StartSidesRoundGrenades"
+	{
+		"en"		"\"A wife is like a hand grenade: Remove the ring and your house is gone.\""
+	}
+	"StartSidesRoundScout"
+	{
+		"en"		"\"One man can change the world with a bullet in the right place.\""
+	}
+	"StartSidesRoundKnife"
+	{
+		"en"		"\"Remember: A sharp knife is a chef's best friend!\""
+	}
+	"StartSidesRoundDeagle"
+	{
+		"en"		"\"Beware of the hand cannon.\""
+	}
+	"SetupHint"
+	{
+		"en"		"Type .setup to start match configuration, change map or toggle between Wingman and Competitive mode."
+	}
+	"WaitingForStartHint"
+	{
+		"#format"	"{1:s},{2:s}"
+		"en"		"Discord: Please join \"{1}\"\nWaiting for {2} to type .start"
+	}
+	"CountDownToLive"
+	{
+		"#format"	"{1:i}"
+		"en"		"Match is going live in {1}..."
+	}
+	"GoLive"
+	{
+		"en"		"The match is live. There's no turning back now."
+	}
 	"ReadyStatusPlayers"
 	{
 		"#format"	"{1:i},{2:i}"
-		"en"		"{1} out of {2} players are ready"
+		"en"		"{1} out of {2} players are ready."
 	}
 	"ReadyStatus"
 	{
 		"#format"	"{1:i},{2:i},{3:s}"
-		"en"		"{1} out of {2} players are ready\nType {3} to ready up"
+		"en"		"{1} out of {2} players are ready.\nType {3} to mark yourself ready to play."
 	}
 	"ReadyStatusCaptains"
 	{
-		"#format"	"{1:i},{2:i},{3:s},{4:s}"
-		"en"		"{1} out of {2} players are ready\nCaptain 1: {3}\nCaptain 2: {4}"
+		"#format"	"{1:i},{2:i},{3:s},{4:s},{5:s}"
+		"en"		"{1} out of {2} players are ready.\nType {3} to mark yourself ready to play.\nCaptain 1: {4}\nCaptain 2: {5}"
 	}
 	"ReadyStatusAllReadyPick"
 	{
@@ -309,7 +351,7 @@
 	"Countdown"
 	{
 		"#format"	"{1:d}"
-		"en"		"Countdown: {GREEN}{1} {NORMAL}seconds"
+		"en"		"Live in {GREEN}{1}{NORMAL}..."
 	}
 	"Ready"
 	{
@@ -319,23 +361,23 @@
 	{
 		"en"		"[Not Ready]"
 	}
-	"KnifeRound"
+	"SidesRound"
 	{
-		"en"		"KNIFE!"
+		"en"		"Win the round to pick starting sides!"
 	}
-	"KnifeRoundOption"
+	"SidesRoundOption"
 	{
-		"en"		"Knife round"
+		"en"		"Sides Round"
 	}
 	"KnifeRoundWinner"
 	{
 		"#format"	"{1:s},{2:s},{3:s}"
-		"en"		"The {1} team won the knife round. Waiting for them to type {GREEN}{2} {NORMAL}or {GREEN}{3}"
+		"en"		"The {1} team won the round. Waiting for them to type {GREEN}{2} {NORMAL}or {GREEN}{3}"
 	}
 	"KnifeRoundWinnerVote"
 	{
 		"#format"	"{1:s},{2:s},{3:s}"
-		"en"		"The {1} team won the knife round. Waiting for them to vote by typing {GREEN}{2} {NORMAL}or {GREEN}{3}"
+		"en"		"The {1} team won the round. Waiting for them to vote by typing {GREEN}{2} {NORMAL}or {GREEN}{3}"
 	}
 	"TVDisabled"
 	{
@@ -343,7 +385,7 @@
 	}
 	"FinishSetup"
 	{
-		"en"		"Finish setup"
+		"en"		"Start match"
 	}
 	"CancelSetup"
 	{
@@ -486,5 +528,10 @@
 	{
 		"#format"		"{1:s},{2:s},{3:s}"
 		"en"		"{GREEN}{1}{NORMAL} won, {GREEN}{2}{NORMAL} came in 2nd, {GREEN}{3}{NORMAL} in 3rd"
+	}
+	"ChangeGameMode"
+	{
+		"#format"		"{1:s}"
+		"en"		"Switching game mode to {GREEN}{1}...{NORMAL}"
 	}
 }

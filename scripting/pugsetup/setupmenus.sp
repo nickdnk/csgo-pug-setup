@@ -63,12 +63,12 @@ public void SetupMenu(int client, bool displayOnly, int menuPosition) {
     AddMenuItem(menu, "demo", buffer, style);
   }
 
-  // 5. knife round option
-  if (g_DisplayKnifeRound) {
+  // 5. sides round option
+  if (g_DisplaySidesRound) {
     char enabledString[128];
-    GetEnabledString(enabledString, sizeof(enabledString), g_DoKnifeRound, client);
-    Format(buffer, sizeof(buffer), "%T: %s", "KnifeRoundOption", client, enabledString);
-    AddMenuItem(menu, "knife", buffer, style);
+    GetSidesString(enabledString, sizeof(enabledString), g_SidesRound, client);
+    Format(buffer, sizeof(buffer), "%T: %s", "SidesRoundOption", client, enabledString);
+    AddMenuItem(menu, "sides", buffer, style);
   }
 
   // 6. autolive option
@@ -115,6 +115,17 @@ public void SetupMenu(int client, bool displayOnly, int menuPosition) {
     AddMenuItem(menu, "change_map", buffer, style);
   }
 
+  // 11. Toggle friendly fire
+  if (g_DisplayFriendlyFire) {
+    char enabledString[128];
+    GetEnabledString(enabledString, sizeof(enabledString), g_FriendlyFire, client);
+    Format(buffer, sizeof(buffer), "%T: %s", "FriendlyFireOption", client, enabledString);
+    AddMenuItem(menu, "friendly_fire", buffer, style);
+  }
+
+  // 12. Toggle game mode
+  AddMenuItem(menu, "game_mode", GetGameMode() == const_GameModeCompetitive  ? "Set to Wingman (2v2)" : "Set to Competitive (5v5)", style);
+
   Action action = Plugin_Continue;
   Call_StartForward(g_hOnSetupMenuOpen);
   Call_PushCell(client);
@@ -156,8 +167,21 @@ public int SetupMenuHandler(Menu menu, MenuAction action, int param1, int param2
     } else if (StrEqual(buffer, "demo")) {
       DemoHandler(client);
 
-    } else if (StrEqual(buffer, "knife")) {
-      g_DoKnifeRound = !g_DoKnifeRound;
+    } else if (StrEqual(buffer, "sides")) {
+
+      // Cycle SidesRound options when pressed.
+      if (g_SidesRound == SidesRound_None) {
+        g_SidesRound = SidesRound_Knife;
+      } else if (g_SidesRound == SidesRound_Knife) {
+        g_SidesRound = SidesRound_Deagle;
+      } else if (g_SidesRound == SidesRound_Deagle) {
+        g_SidesRound = SidesRound_Scout;
+      } else if (g_SidesRound == SidesRound_Scout) {
+        g_SidesRound = SidesRound_Grenades;
+      } else {
+        g_SidesRound = SidesRound_None;
+      }
+
       PugSetup_GiveSetupMenu(client, false, pos);
 
     } else if (StrEqual(buffer, "autolive")) {
@@ -169,6 +193,10 @@ public int SetupMenuHandler(Menu menu, MenuAction action, int param1, int param2
 
     } else if (StrEqual(buffer, "change_map")) {
       ChangeMapMenu(client);
+
+    } else if (StrEqual(buffer, "friendly_fire")) {
+      g_FriendlyFire = !g_FriendlyFire;
+      PugSetup_GiveSetupMenu(client, false, pos);
 
     } else if (StrEqual(buffer, "playout")) {
       g_DoPlayout = !g_DoPlayout;
@@ -183,6 +211,12 @@ public int SetupMenuHandler(Menu menu, MenuAction action, int param1, int param2
     } else if (StrEqual(buffer, "aim_warmup")) {
       g_DoAimWarmup = !g_DoAimWarmup;
       PugSetup_GiveSetupMenu(client, false, pos);
+    } else if (StrEqual(buffer, "game_mode")) {
+      int newGameMode = ToggleGameMode();
+      g_PlayersPerTeam = newGameMode == const_GameModeWingman ? 2 : 5;
+      g_TeamType = newGameMode == const_GameModeWingman ? TeamType_Manual : TeamType_Captains;
+      PugSetup_MessageToAll("%t", "ChangeGameMode", newGameMode == const_GameModeWingman ? "Wingman (2v2)" : "Competitive (5v5)");
+      CreateTimer(3.0, Timer_ChangeGameMode, _, TIMER_FLAG_NO_MAPCHANGE);
     }
 
     Call_StartForward(g_hOnSetupMenuSelect);
@@ -195,6 +229,16 @@ public int SetupMenuHandler(Menu menu, MenuAction action, int param1, int param2
   } else if (action == MenuAction_End) {
     delete menu;
   }
+}
+
+public Action Timer_ChangeGameMode(Handle timer) {
+
+    char map[128]; 
+    GetCurrentMap(map, sizeof(map));
+    ForceChangeLevel(map, "Switch game mode");
+
+    return Plugin_Handled;
+
 }
 
 public void TeamTypeMenu(int client) {
@@ -333,14 +377,35 @@ public void SetupFinished() {
 }
 
 public void StartLiveTimer() {
-  if (!g_LiveTimerRunning)
+  if (!g_LiveTimerRunning) {
     CreateTimer(LIVE_TIMER_INTERVAL, Timer_CheckReady, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-  g_LiveTimerRunning = true;
+    g_LiveTimerRunning = true;
+
+    
+
+  }
 }
 
 /**
  * Converts enum choice types to strings to show to players.
  */
+ stock void GetSidesString(char[] buffer, int length, SidesRound sidesRound, int client = LANG_SERVER) {
+   
+  switch (sidesRound) {
+    case SidesRound_None:
+      Format(buffer, length, "None");
+    case SidesRound_Deagle:
+      Format(buffer, length, "Deagle");
+    case SidesRound_Knife:
+      Format(buffer, length, "Knife");
+    case SidesRound_Scout:
+      Format(buffer, length, "Scout");
+    case SidesRound_Grenades:
+      Format(buffer, length, "Grenades");
+  }
+  
+}
+
 stock void GetTeamString(char[] buffer, int length, TeamType type, int client = LANG_SERVER) {
   switch (type) {
     case TeamType_Manual:

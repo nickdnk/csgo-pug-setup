@@ -16,9 +16,9 @@ public Action Command_Pugstatus(int client, int args) {
       Format(stateString, sizeof(stateString), "Waiting for .start command from the leader");
     case GameState_Countdown:
       Format(stateString, sizeof(stateString), "Countdown timer active");
-    case GameState_KnifeRound:
+    case GameState_SidesRound:
       Format(stateString, sizeof(stateString), "In knife round");
-    case GameState_WaitingForKnifeRoundDecision:
+    case GameState_WaitingForSidesRoundDecision:
       Format(stateString, sizeof(stateString), "Waiting for knife winner to pick sides");
     case GameState_GoingLive:
       Format(stateString, sizeof(stateString), "Going live");
@@ -64,8 +64,11 @@ public Action Command_Pugstatus(int client, int args) {
     GetEnabledString(buffer, sizeof(buffer), g_AutoLive);
     ReplyToCommand(client, "Autolive: %s", buffer);
 
-    GetEnabledString(buffer, sizeof(buffer), g_DoKnifeRound);
-    ReplyToCommand(client, "Knife round: %s", buffer);
+    GetSidesString(buffer, sizeof(buffer), g_SidesRound);
+    ReplyToCommand(client, "Sides round: %s", buffer);
+
+    GetEnabledString(buffer, sizeof(buffer), g_FriendlyFire);
+    ReplyToCommand(client, "Friendly fire: %s", buffer);
 
     if (g_MapType == MapType_Vote || g_MapType == MapType_Veto) {
       GetTrueString(buffer, sizeof(buffer), g_OnDecidedMap);

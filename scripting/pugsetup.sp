@@ -12,8 +12,6 @@
 #include <SteamWorks>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-#define UPDATE_URL "http://dl.whiffcity.com/plugins/pugsetup/pugsetup.txt"
 
 #define ALIAS_LENGTH 64
 #define COMMAND_LENGTH 64
@@ -35,16 +33,14 @@ ConVar g_AllowCustomReadyMessageCvar;
 ConVar g_AnnounceCountdownCvar;
 ConVar g_AutoRandomizeCaptainsCvar;
 ConVar g_AutoSetupCvar;
-ConVar g_AutoUpdateCvar;
 ConVar g_CvarVersionCvar;
 ConVar g_DemoNameFormatCvar;
 ConVar g_DemoTimeFormatCvar;
 ConVar g_DisplayMapVotesCvar;
-ConVar g_DoVoteForKnifeRoundDecisionCvar;
+ConVar g_DoVoteForSidesRoundDecisionCvar;
 ConVar g_EchoReadyMessagesCvar;
 ConVar g_ExcludedMaps;
 ConVar g_ExcludeSpectatorsCvar;
-ConVar g_ExecDefaultConfigCvar;
 ConVar g_ForceDefaultsCvar;
 ConVar g_InstantRunoffVotingCvar;
 ConVar g_LiveCfgCvar;
@@ -60,16 +56,18 @@ ConVar g_RandomizeMapOrderCvar;
 ConVar g_RandomOptionInMapVoteCvar;
 ConVar g_SetupEnabledCvar;
 ConVar g_SnakeCaptainsCvar;
-ConVar g_StartDelayCvar;
 ConVar g_UseGameWarmupCvar;
 ConVar g_WarmupCfgCvar;
 ConVar g_WarmupMoneyOnSpawnCvar;
+ConVar g_TeamName1Cvar;
+ConVar g_TeamName2Cvar;
 
 /** Setup menu options **/
 bool g_DisplayMapType = true;
 bool g_DisplayTeamType = true;
 bool g_DisplayAutoLive = true;
-bool g_DisplayKnifeRound = true;
+bool g_DisplaySidesRound = true;
+bool g_DisplayFriendlyFire = true;
 bool g_DisplayTeamSize = true;
 bool g_DisplayRecordDemo = true;
 bool g_DisplayMapChange = false;
@@ -88,8 +86,9 @@ int g_PlayersPerTeam = 5;
 TeamType g_TeamType = TeamType_Captains;
 MapType g_MapType = MapType_Vote;
 bool g_RecordGameOption = false;
-bool g_DoKnifeRound = false;
+SidesRound g_SidesRound = SidesRound_None;
 bool g_AutoLive = true;
+bool g_FriendlyFire = true;
 bool g_DoAimWarmup = false;
 bool g_DoPlayout = false;
 
@@ -105,6 +104,7 @@ bool g_Recording = true;
 char g_DemoFileName[PLATFORM_MAX_PATH];
 bool g_LiveTimerRunning = false;
 int g_CountDownTicks = 0;
+int g_LiveMessageCount = 8;
 bool g_ForceStartSignal = false;
 
 #define CAPTAIN_COMMAND_HINT_TIME 15
@@ -150,15 +150,16 @@ bool g_PlayerAtStart[MAXPLAYERS + 1];
 bool g_SavedClanTag[MAXPLAYERS + 1];
 char g_ClanTag[MAXPLAYERS + 1][CLANTAG_LENGTH];
 
-/** Knife round data **/
-int g_KnifeWinner = -1;
-enum KnifeDecision {
-  KnifeDecision_None,
-  KnifeDecision_Stay,
-  KnifeDecision_Swap,
+/** Sides round data **/
+int g_SidesWinner = -1;
+enum SidesDecision {
+  SidesDecision_None,
+  SidesDecision_Stay,
+  SidesDecision_Swap,
 };
-KnifeDecision g_KnifeRoundVotes[MAXPLAYERS + 1];
-int g_KnifeNumVotesNeeded = 0;
+SidesDecision g_SidesRoundVotes[MAXPLAYERS + 1];
+int g_SidesNumVotesNeeded = 0;
+int g_SidesMessageCount = 0;
 
 /** Forwards **/
 Handle g_OnForceEnd = INVALID_HANDLE;
@@ -205,11 +206,11 @@ Handle g_hOnWarmupCfg = INVALID_HANDLE;
 
 // clang-format off
 public Plugin myinfo = {
-    name = "CS:GO PugSetup",
-    author = "splewis",
-    description = "Tools for setting up pugs/10mans",
+    name = "Nyx Custom CS:GO PugSetup",
+    author = "splewis (forked by nickdnk)",
+    description = "Tools for setting up pugs.",
     version = PLUGIN_VERSION,
-    url = "https://github.com/splewis/csgo-pug-setup"
+    url = "https://github.com/nickdnk/csgo-pug-setup"
 };
 // clang-format on
 
@@ -238,9 +239,6 @@ public void OnPluginStart() {
   g_AutoSetupCvar =
       CreateConVar("sm_pugsetup_autosetup", "0",
                    "Whether a pug is automatically setup using the default setup options or not.");
-  g_AutoUpdateCvar = CreateConVar(
-      "sm_pugsetup_autoupdate", "1",
-      "Whether the plugin may (if the \"Updater\" plugin is loaded) automatically update.");
   g_DemoNameFormatCvar = CreateConVar(
       "sm_pugsetup_demo_name_format", "pug_{TIME}_{MAP}",
       "Naming scheme for demos. You may use {MAP}, {TIME}, and {TEAMSIZE}. Make sure there are no spaces or colons in this.");
@@ -250,8 +248,8 @@ public void OnPluginStart() {
   g_DisplayMapVotesCvar =
       CreateConVar("sm_pugsetup_display_map_votes", "1",
                    "Whether votes cast by players will be displayed to everyone");
-  g_DoVoteForKnifeRoundDecisionCvar = CreateConVar(
-      "sm_pugsetup_vote_for_knife_round_decision", "0",
+  g_DoVoteForSidesRoundDecisionCvar = CreateConVar(
+      "sm_pugsetup_vote_for_knife_round_decision", "1",
       "If 0, the first player to type .stay/.swap/.t/.ct will decide the round round winner decision - otherwise a majority vote will be used");
   g_EchoReadyMessagesCvar = CreateConVar("sm_pugsetup_echo_ready_messages", "1",
                                          "Whether to print to chat when clients ready/unready.");
@@ -261,9 +259,6 @@ public void OnPluginStart() {
   g_ExcludeSpectatorsCvar = CreateConVar(
       "sm_pugsetup_exclude_spectators", "0",
       "Whether to exclude spectators in the ready-up counts. Setting this to 1 will exclude specators from being selected by captains as well.");
-  g_ExecDefaultConfigCvar = CreateConVar(
-      "sm_pugsetup_exec_default_game_config", "1",
-      "Whether gamemode_competitive (the matchmaking config) should be executed before the live config.");
   g_ForceDefaultsCvar = CreateConVar(
       "sm_pugsetup_force_defaults", "0",
       "Whether the default setup options are forced as the setup options (note that admins can override them still).");
@@ -293,7 +288,7 @@ public void OnPluginStart() {
       CreateConVar("sm_pugsetup_postgame_cfg", "sourcemod/pugsetup/warmup.cfg",
                    "Config to execute after games finish; should be in the csgo/cfg directory.");
   g_QuickRestartsCvar = CreateConVar(
-      "sm_pugsetup_quick_restarts", "0",
+      "sm_pugsetup_quick_restarts", "1",
       "If set to 1, going live won't restart 3 times and will just do a single restart.");
   g_RandomizeMapOrderCvar =
       CreateConVar("sm_pugsetup_randomize_maps", "1",
@@ -302,14 +297,10 @@ public void OnPluginStart() {
       CreateConVar("sm_pugsetup_random_map_vote_option", "1",
                    "Whether option 1 in a mapvote is the random map choice.");
   g_SetupEnabledCvar = CreateConVar("sm_pugsetup_setup_enabled", "1",
-                                    "Whether the sm_setup and sm_10man commands are enabled");
+                                    "Whether the sm_setup command is enabled");
   g_SnakeCaptainsCvar = CreateConVar(
       "sm_pugsetup_snake_captain_picks", "0",
       "If set to 0: captains pick players in a ABABABAB order. If set to 1, in a ABBAABBA order. If set to 2, in a ABBABABA order. If set to 3, in a ABBABAAB order.");
-  g_StartDelayCvar =
-      CreateConVar("sm_pugsetup_start_delay", "5",
-                   "How many seconds of a countdown phase right before the lo3 process begins.", _,
-                   true, 0.0, true, 60.0);
   g_UseGameWarmupCvar = CreateConVar(
       "sm_pugsetup_use_game_warmup", "1",
       "Whether to use csgo's built-in warmup functionality. The warmup config (sm_pugsetup_warmup_cfg) will be executed regardless of this setting.");
@@ -319,6 +310,9 @@ public void OnPluginStart() {
   g_WarmupMoneyOnSpawnCvar = CreateConVar(
       "sm_pugsetup_money_on_warmup_spawn", "1",
       "Whether clients recieve 16,000 dollars when they spawn. It's recommended you use mp_death_drop_gun 0 in your warmup config if you use this.");
+
+  g_TeamName1Cvar = CreateConVar("sm_pugsetup_team_name_1", "", "The name of team 1.");
+  g_TeamName2Cvar = CreateConVar("sm_pugsetup_team_name_2", "", "The name of team 2.");
 
   /** Create and exec plugin's configuration file **/
   AutoExecConfig(true, "pugsetup", "sourcemod/pugsetup");
@@ -340,9 +334,6 @@ public void OnPluginStart() {
                      ChatAlias_WhenSetup);
   AddPugSetupCommand("setup", Command_Setup,
                      "Starts pug setup (.ready, .capt commands become avaliable)", Permission_All);
-  AddPugSetupCommand("10man", Command_10man,
-                     "Starts 10man setup (alias for .setup with 10 man/gather settings)",
-                     Permission_All);
   AddPugSetupCommand("rand", Command_Rand, "Sets random captains", Permission_Captains,
                      ChatAlias_WhenSetup);
   AddPugSetupCommand("pause", Command_Pause, "Pauses the game", Permission_All,
@@ -458,12 +449,9 @@ public void OnPluginStart() {
   }
   Format(g_CacheFile, sizeof(g_CacheFile), "%s/cache.cfg", g_DataDir);
 
-  /** Updater support **/
-  if (GetConVarInt(g_AutoUpdateCvar) != 0) {
-    if (LibraryExists("updater")) {
-      Updater_AddPlugin(UPDATE_URL);
-    }
-  }
+  PrintToServer("|-------------------------------|");
+  PrintToServer("|---- Nyx Custom PUG Loaded ----|");
+  PrintToServer("|-------------------------------|");
 }
 
 static void AddPugSetupCommand(const char[] command, ConCmd callback, const char[] description,
@@ -495,14 +483,6 @@ public void OnConfigsExecuted() {
   FillMapList(g_MapListCvar, g_MapList);
   FillMapList(g_AimMapListCvar, g_AimMapList);
   ReadPermissions();
-}
-
-public void OnLibraryAdded(const char[] name) {
-  if (GetConVarInt(g_AutoUpdateCvar) != 0) {
-    if (LibraryExists("updater")) {
-      Updater_AddPlugin(UPDATE_URL);
-    }
-  }
 }
 
 public bool OnClientConnect(int client, char[] rejectmsg, int maxlen) {
@@ -551,6 +531,10 @@ public void OnMapStart() {
     for (int i = 1; i <= MaxClients; i++) {
       g_Ready[i] = false;
       g_Teams[i] = CS_TEAM_NONE;
+    }
+
+    if (g_GameState == GameState_None) {
+      StartSetupHint();
     }
   }
 }
@@ -728,7 +712,10 @@ static void GiveCaptainHint(int client, int readyPlayers, int totalPlayers) {
     Format(cap2, sizeof(cap2), "%T", "CaptainNotSelected", client);
   }
 
-  PrintHintTextToAll("%t", "ReadyStatusCaptains", readyPlayers, totalPlayers, cap1, cap2);
+  char rdyCommand[ALIAS_LENGTH];
+  FindAliasFromCommand("sm_ready", rdyCommand);
+
+  PrintHintTextToAll("%t", "ReadyStatusCaptains", readyPlayers, totalPlayers, rdyCommand, cap1, cap2);
 
   // if there aren't any captains and we full players, print the hint telling the leader how to set
   // captains
@@ -794,43 +781,12 @@ public Action Command_Setup(int client, int args) {
   if (client == 0) {
     // if we did the setup command from the console just use the default settings
     ReadSetupOptions();
-    PugSetup_SetupGame(g_TeamType, g_MapType, g_PlayersPerTeam, g_RecordGameOption, g_DoKnifeRound,
-                       g_AutoLive);
+    PugSetup_SetupGame(g_TeamType, g_MapType, g_PlayersPerTeam, g_RecordGameOption, g_SidesRound,
+                       g_AutoLive, g_FriendlyFire);
   } else {
     PugSetup_GiveSetupMenu(client);
   }
 
-  return Plugin_Handled;
-}
-
-public Action Command_10man(int client, int args) {
-  if (g_SetupEnabledCvar.IntValue == 0) {
-    return Plugin_Handled;
-  }
-
-  if (g_GameState > GameState_Warmup) {
-    PugSetup_Message(client, "%t", "AlreadyLive");
-    return Plugin_Handled;
-  }
-
-  bool allowedToSetup = DoPermissionCheck(client, "sm_10man");
-  if (g_GameState == GameState_None && !allowedToSetup) {
-    PugSetup_Message(client, "%t", "NoPermission");
-    return Plugin_Handled;
-  }
-
-  bool allowedToChangeSetup = PugSetup_HasPermissions(client, Permission_Leader);
-  if (g_GameState == GameState_Warmup && !allowedToChangeSetup) {
-    PugSetup_GiveSetupMenu(client, true);
-    return Plugin_Handled;
-  }
-
-  if (IsPlayer(client)) {
-    g_Leader = client;
-  }
-
-  PugSetup_SetupGame(TeamType_Captains, MapType_Vote, 5, g_RecordGameOption, g_DoKnifeRound,
-                     g_AutoLive);
   return Plugin_Handled;
 }
 
@@ -964,7 +920,7 @@ public Action Command_Start(int client, int args) {
     return Plugin_Handled;
   }
 
-  CreateCountDown();
+  StartGame();
   return Plugin_Handled;
 }
 
@@ -994,11 +950,7 @@ public void LoadExtraAliases() {
   PugSetup_AddChatAlias(".endmatch", "sm_endgame", ChatAlias_WhenSetup);
   PugSetup_AddChatAlias(".cancel", "sm_endgame", ChatAlias_WhenSetup);
   PugSetup_AddChatAlias(".gaben", "sm_ready", ChatAlias_WhenSetup);
-  PugSetup_AddChatAlias(".gs4lyfe", "sm_ready", ChatAlias_WhenSetup);
-  PugSetup_AddChatAlias(".splewis", "sm_ready", ChatAlias_WhenSetup);
   PugSetup_AddChatAlias(".unready", "sm_notready", ChatAlias_WhenSetup);
-  PugSetup_AddChatAlias(".paws", "sm_pause", ChatAlias_WhenSetup);
-  PugSetup_AddChatAlias(".unpaws", "sm_unpause", ChatAlias_WhenSetup);
   PugSetup_AddChatAlias(".switch", "sm_swap", ChatAlias_WhenSetup);
   PugSetup_AddChatAlias(".forcestop", "sm_forceend", ChatAlias_WhenSetup);
 }
@@ -1235,7 +1187,7 @@ public Action Command_ForceReady(int client, int args) {
 }
 
 static bool Pauseable() {
-  return g_GameState >= GameState_KnifeRound && g_PausingEnabledCvar.IntValue != 0;
+  return g_GameState >= GameState_SidesRound && g_PausingEnabledCvar.IntValue != 0;
 }
 
 public Action Command_Pause(int client, int args) {
@@ -1598,16 +1550,17 @@ public Action Timer_EndMatch(Handle timer) {
 
 public Action Event_RoundStart(Event event, const char[] name, bool dontBroadcast) {
   CheckAutoSetup();
+  CheckSidesRoundForGrenades();
 }
 
 public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) {
-  if (g_GameState == GameState_KnifeRound) {
-    ChangeState(GameState_WaitingForKnifeRoundDecision);
-    g_KnifeWinner = GetKnifeRoundWinner();
-    LogDebug("Set g_KnifeWinner = %d", g_KnifeWinner);
+  if (g_GameState == GameState_SidesRound) {
+    ChangeState(GameState_WaitingForSidesRoundDecision);
+    g_SidesWinner = GetSidesRoundWinner();
+    LogDebug("Set g_SidesWinner = %d", g_SidesWinner);
 
     char teamString[4];
-    if (g_KnifeWinner == CS_TEAM_CT)
+    if (g_SidesWinner == CS_TEAM_CT)
       teamString = "CT";
     else
       teamString = "T";
@@ -1617,12 +1570,15 @@ public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
     FindAliasFromCommand("sm_stay", stayCmd);
     FindAliasFromCommand("sm_swap", swapCmd);
 
-    if (g_DoVoteForKnifeRoundDecisionCvar.IntValue != 0) {
-      CreateTimer(20.0, Timer_HandleKnifeDecisionVote, _, TIMER_FLAG_NO_MAPCHANGE);
+    if (g_DoVoteForSidesRoundDecisionCvar.IntValue != 0) {
+      CreateTimer(20.0, Timer_HandleSidesDecisionVote, _, TIMER_FLAG_NO_MAPCHANGE);
       PugSetup_MessageToAll("%t", "KnifeRoundWinnerVote", teamString, stayCmd, swapCmd);
     } else {
       PugSetup_MessageToAll("%t", "KnifeRoundWinner", teamString, stayCmd, swapCmd);
     }
+
+    Pause();
+
   }
 }
 
@@ -1687,6 +1643,10 @@ public void PrintSetupInfo(int client) {
     PugSetup_Message(client, "%t: {GREEN}%s", "MapTypeOption", buffer);
   }
 
+  PugSetup_Message(client, "%t: {GREEN}%s", "GameTypeOption", GetGameMode() == const_GameModeWingman ? "Wingman" : "Competitive");
+
+  PugSetup_Message(client, "%t: {GREEN}%s", "FriendlyFireOption", g_FriendlyFire ? "Yes" : "No");
+
   if (g_DisplayTeamSize || g_DisplayTeamType) {
     GetTeamString(buffer, sizeof(buffer), g_TeamType, client);
     PugSetup_Message(client, "%t: ({GREEN}%d vs %d{NORMAL}) {GREEN}%s", "TeamTypeOption",
@@ -1698,9 +1658,9 @@ public void PrintSetupInfo(int client) {
     PugSetup_Message(client, "%t: {GREEN}%s", "DemoOption", buffer);
   }
 
-  if (g_DisplayKnifeRound) {
-    GetEnabledString(buffer, sizeof(buffer), g_DoKnifeRound, client);
-    PugSetup_Message(client, "%t: {GREEN}%s", "KnifeRoundOption", buffer);
+  if (g_DisplaySidesRound) {
+    GetSidesString(buffer, sizeof(buffer), g_SidesRound, client);
+    PugSetup_Message(client, "%t: {GREEN}%s", "SidesRoundOption", buffer);
   }
 
   if (g_DisplayAutoLive) {
@@ -1718,13 +1678,68 @@ public void ReadyToStart() {
   Call_StartForward(g_hOnReadyToStart);
   Call_Finish();
 
+  char teamName1[PLATFORM_MAX_PATH];
+  char teamName2[PLATFORM_MAX_PATH];
+
+  GetConVarString(g_TeamName1Cvar, teamName1, PLATFORM_MAX_PATH);
+  GetConVarString(g_TeamName2Cvar, teamName2, PLATFORM_MAX_PATH);
+
+  if (strlen(teamName1) > 0 && strlen(teamName2) > 0) {
+
+      SetTeamInfo(CS_TEAM_CT, teamName1, "");
+      SetTeamInfo(CS_TEAM_T, teamName2, "");
+      ShowWaitingForStartHint();
+      CreateTimer(1.0, Timer_ShowWaitingForStartHint, _, TIMER_REPEAT);
+      
+  }
+
   if (g_AutoLive) {
-    CreateCountDown();
+    StartGame();
   } else {
     ChangeState(GameState_WaitingForStart);
     CreateTimer(float(START_COMMAND_HINT_TIME), Timer_StartCommandHint);
     GiveStartCommandHint();
   }
+}
+
+public void ShowWaitingForStartHint() {
+
+  char teamName1[PLATFORM_MAX_PATH];
+  char teamName2[PLATFORM_MAX_PATH];
+
+  GetConVarString(g_TeamName1Cvar, teamName1, PLATFORM_MAX_PATH);
+  GetConVarString(g_TeamName2Cvar, teamName2, PLATFORM_MAX_PATH);
+
+  char leader[64];
+
+  GetClientName(PugSetup_GetLeader(), leader, sizeof(leader));
+
+  for (int i = 1; i <= MaxClients; i++) {
+
+    if (IsPlayer(i)) {
+
+      int playerTeam = GetClientTeam(i);
+      if (playerTeam == CS_TEAM_CT) {
+          PrintHintText(i, "%t", "WaitingForStartHint", teamName1, leader);
+      } else if (playerTeam == CS_TEAM_T) {
+          PrintHintText(i, "%t", "WaitingForStartHint", teamName2, leader);
+      }
+
+    }
+
+  }
+
+}
+
+public Action Timer_ShowWaitingForStartHint(Handle timer) {
+  if (g_GameState != GameState_WaitingForStart) {
+    return Plugin_Stop;
+  }
+
+  ShowWaitingForStartHint();
+
+  return Plugin_Continue;
+
 }
 
 static void GiveStartCommandHint() {
@@ -1741,12 +1756,6 @@ public Action Timer_StartCommandHint(Handle timer) {
   return Plugin_Continue;
 }
 
-static void CreateCountDown() {
-  ChangeState(GameState_Countdown);
-  g_CountDownTicks = g_StartDelayCvar.IntValue;
-  CreateTimer(1.0, Timer_CountDown, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-}
-
 public Action Timer_CountDown(Handle timer) {
   if (g_GameState != GameState_Countdown) {
     // match cancelled
@@ -1754,14 +1763,19 @@ public Action Timer_CountDown(Handle timer) {
     return Plugin_Stop;
   }
 
-  if (g_CountDownTicks <= 0) {
-    StartGame();
-    return Plugin_Stop;
-  }
+  if (g_AnnounceCountdownCvar.IntValue != 0) {
 
-  if (g_AnnounceCountdownCvar.IntValue != 0 &&
-      (g_CountDownTicks < 5 || g_CountDownTicks % 5 == 0)) {
-    PugSetup_MessageToAll("%t", "Countdown", g_CountDownTicks);
+      PrintHintTextToAll("%t", "CountDownToLive", g_CountDownTicks);
+      PugSetup_MessageToAll("%t", "Countdown", g_CountDownTicks);
+    }
+
+  if (g_CountDownTicks <= 1) {
+    
+    // reset startmoney and grenade count
+    ServerCommand("mp_startmoney 800;ammo_grenade_limit_default 1;sv_maxspeed 320");
+    BeginLO3();
+    return Plugin_Stop;
+
   }
 
   g_CountDownTicks--;
@@ -1770,49 +1784,6 @@ public Action Timer_CountDown(Handle timer) {
 }
 
 public void StartGame() {
-  if (g_RecordGameOption && !IsTVEnabled()) {
-    LogError("GOTV demo could not be recorded since tv_enable is not set to 1");
-  } else if (g_RecordGameOption && IsTVEnabled()) {
-    // get the map, with any workshop stuff before removed
-    // this is {MAP} in the format string
-    char mapName[128];
-    GetCurrentMap(mapName, sizeof(mapName));
-    int last_slash = 0;
-    int len = strlen(mapName);
-    for (int i = 0; i < len; i++) {
-      if (mapName[i] == '/' || mapName[i] == '\\')
-        last_slash = i + 1;
-    }
-
-    // get the time, this is {TIME} in the format string
-    char timeFormat[64];
-    g_DemoTimeFormatCvar.GetString(timeFormat, sizeof(timeFormat));
-    int timeStamp = GetTime();
-    char formattedTime[64];
-    FormatTime(formattedTime, sizeof(formattedTime), timeFormat, timeStamp);
-
-    // get the player count, this is {TEAMSIZE} in the format string
-    char playerCount[MAX_INTEGER_STRING_LENGTH];
-    IntToString(g_PlayersPerTeam, playerCount, sizeof(playerCount));
-
-    // create the actual demo name to use
-    char demoName[PLATFORM_MAX_PATH];
-    g_DemoNameFormatCvar.GetString(demoName, sizeof(demoName));
-
-    ReplaceString(demoName, sizeof(demoName), "{MAP}", mapName[last_slash], false);
-    ReplaceString(demoName, sizeof(demoName), "{TEAMSIZE}", playerCount, false);
-    ReplaceString(demoName, sizeof(demoName), "{TIME}", formattedTime, false);
-
-    Call_StartForward(g_hOnStartRecording);
-    Call_PushString(demoName);
-    Call_Finish();
-
-    if (Record(demoName)) {
-      LogMessage("Recording to %s", demoName);
-      Format(g_DemoFileName, sizeof(g_DemoFileName), "%s.dem", demoName);
-      g_Recording = true;
-    }
-  }
 
   for (int i = 1; i <= MaxClients; i++) {
     g_PlayerAtStart[i] = IsPlayer(i);
@@ -1850,21 +1821,37 @@ public void StartGame() {
     ScrambleTeams();
   }
 
-  CreateTimer(3.0, Timer_BeginMatch);
-  ExecGameConfigs();
+  // dont know why we need this delay
   if (InWarmup()) {
     EndWarmup();
   }
+
+  if (g_SidesRound == SidesRound_None) {
+
+    StartCountDown();
+
+  } else {
+
+    ChangeState(GameState_SidesRound);
+    StartSidesRound(g_SidesRound);
+
+  }
+  
 }
 
-public Action Timer_BeginMatch(Handle timer) {
-  if (g_DoKnifeRound) {
-    ChangeState(GameState_KnifeRound);
-    CreateTimer(3.0, StartKnifeRound, _, TIMER_FLAG_NO_MAPCHANGE);
-  } else {
-    ChangeState(GameState_GoingLive);
-    CreateTimer(3.0, BeginLO3, _, TIMER_FLAG_NO_MAPCHANGE);
-  }
+public void StartCountDown() {
+
+  ExecGameConfigs();
+
+  // Remove money during countdown to not confuse people and have them buy twice.
+  ServerCommand("mp_startmoney 0");
+  ServerCommand(g_FriendlyFire ? "mp_friendlyfire 1" : "mp_friendlyfire 0");
+  g_CountDownTicks = 6;
+  Pause();
+  RestartGame(1);
+  ChangeState(GameState_Countdown);
+  CreateTimer(1.0, Timer_CountDown, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+
 }
 
 public void ScrambleTeams() {
@@ -1913,8 +1900,8 @@ public void ExecWarmupConfigs() {
 }
 
 public void ExecGameConfigs() {
-  if (g_ExecDefaultConfigCvar.IntValue != 0)
-    ServerCommand("exec gamemode_competitive");
+  // Exec default 5v5 or 2v2 game config depending on game mode. 1 = 5v5, 2 = 2v2
+  ServerCommand(GetGameMode() == const_GameModeWingman ? "exec gamemode_competitive2v2_server" : "exec gamemode_competitive_server");
 
   ExecCfg(g_LiveCfgCvar);
   if (InWarmup())
@@ -1978,6 +1965,39 @@ stock void EndMatch(bool execConfigs = true, bool doRestart = true) {
   if (doRestart) {
     RestartGame(1);
   }
+
+  StartSetupHint();
+
+}
+
+public void StartSetupHint() {
+
+  CreateTimer(20.0, Timer_ShowSetupHint, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);  
+
+}
+
+public Action ShowSetupHint(Handle timer) {
+
+  if (g_GameState != GameState_None) {
+    return Plugin_Stop;
+  }
+
+  PrintHintTextToAll("%t", "SetupHint");
+  return Plugin_Handled;
+
+}
+
+public Action Timer_ShowSetupHint(Handle timer) {
+
+  if (g_GameState != GameState_None) {
+    return Plugin_Stop;
+  }
+
+  ShowSetupHint(null);
+  CreateTimer(3.0, ShowSetupHint); // Show again after 4 seconds. Text is long.
+
+  return Plugin_Continue;
+
 }
 
 public void SetupMapVotePool(bool excludeRecentMaps) {
@@ -2017,6 +2037,8 @@ public Action StartPicking(Handle timer) {
   Pause();
   RestartGame(1);
 
+  CreateTimer(1.0, Timer_ShowPickMessage, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+
   for (int i = 1; i <= MaxClients; i++) {
     if (IsPlayer(i)) {
       g_Teams[i] = CS_TEAM_SPECTATOR;
@@ -2037,6 +2059,49 @@ public Action StartPicking(Handle timer) {
   return Plugin_Handled;
 }
 
+public Action ShowPickMessage()
+{
+
+    char captain1Name[64];
+    char captain2Name[64];
+    
+    GetClientName(PugSetup_GetCaptain(1),captain1Name,sizeof(captain1Name));
+    GetClientName(PugSetup_GetCaptain(2),captain2Name,sizeof(captain2Name));
+
+    char playerList[512];
+    char playerName[64];
+    
+    int first = 1;
+
+    for (int i = 1; i <= MaxClients; i++) {
+      if (IsPlayer(i) && !IsPlayerPicked(i)) {
+
+        if (!first) {
+          StrCat(playerList, sizeof(playerList), "\n"); 
+        } else {
+          first = 0;
+        }
+
+        GetClientName(i, playerName, sizeof(playerName));
+        StrCat(playerList, sizeof(playerList), playerName);
+      }
+    }
+  
+    PrintHintTextToAll("Please wait while %s and %s pick teams.\n\nRemaining players:\n%s", captain1Name, captain2Name, playerList);
+
+}
+
+public Action Timer_ShowPickMessage(Handle timer) {
+  if (g_GameState != GameState_PickingPlayers) {
+    return Plugin_Stop;
+  }
+
+  ShowPickMessage();
+
+  return Plugin_Continue;
+
+}
+
 public Action FinishPicking(Handle timer) {
   for (int i = 1; i <= MaxClients; i++) {
     if (IsPlayer(i)) {
@@ -2051,10 +2116,14 @@ public Action FinishPicking(Handle timer) {
     }
   }
 
-  Unpause();
   ReadyToStart();
 
   return Plugin_Handled;
+}
+
+stock bool IsPlayerPicked(int client) {
+  int team = g_Teams[client];
+  return team == CS_TEAM_T || team == CS_TEAM_CT;
 }
 
 public Action StopDemo(Handle timer) {
@@ -2073,6 +2142,26 @@ public void CheckAutoSetup() {
     ReadSetupOptions();
     SetupFinished();
   }
+}
+
+public void CheckSidesRoundForGrenades() {
+  if (g_GameState != GameState_SidesRound) {
+    return;
+  }
+
+  if (g_SidesRound != SidesRound_Grenades) {
+    return;
+  }
+
+  for (int i = 1; i <= MaxClients; i++) {
+    if (IsPlayer(i) && !IsClientObserver(i)) {
+      GivePlayerItem(i, "weapon_hegrenade");
+      GivePlayerItem(i, "weapon_hegrenade");
+      GivePlayerItem(i, "weapon_hegrenade");
+      GivePlayerItem(i, "weapon_hegrenade");
+    }
+  }
+
 }
 
 public void ExecCfg(ConVar cvar) {
@@ -2182,6 +2271,27 @@ stock bool TeamTypeFromString(const char[] teamTypeString, TeamType& teamType,
       LogError(
           "Invalid team type: \"%s\", allowed values: \"captains\", \"manual\", \"random\", \"autobalanced\"",
           teamTypeString);
+    return false;
+  }
+
+  return true;
+}
+
+stock bool SidesRoundFromString(const char[] sidesRoundString, SidesRound& sidesRound, bool logError = false) {
+  if (StrEqual(sidesRoundString, "none", false)) {
+    sidesRound = SidesRound_None;
+  } else if (StrEqual(sidesRoundString, "knife", false)) {
+    sidesRound = SidesRound_Knife;
+  } else if (StrEqual(sidesRoundString, "deagle", false)) {
+    sidesRound = SidesRound_Deagle;
+  } else if (StrEqual(sidesRoundString, "scout", false)) {
+    sidesRound = SidesRound_Scout;
+  } else if (StrEqual(sidesRoundString, "grenades", false)) {
+    sidesRound = SidesRound_Grenades;
+  } else {
+    if (logError)
+      LogError("Invalid sides type: \"%s\", allowed values: \"none\", \"knife\", \"deagle\", \"scout\", \"grenades\".",
+               sidesRoundString);
     return false;
   }
 

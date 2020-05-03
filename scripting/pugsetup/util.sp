@@ -208,6 +208,21 @@ stock void RandomizeArray(ArrayList array) {
   }
 }
 
+stock int GetGameMode() {
+  return GetConVarInt(FindConVar("game_mode"));
+}
+
+stock int ToggleGameMode() {
+  Handle gameModeCvar = FindConVar("game_mode");
+  if (gameModeCvar == INVALID_HANDLE) {
+    LogError("Failed to get game_mode cvar");
+    return 1;
+  }
+  int newGameMode = GetConVarInt(gameModeCvar) == const_GameModeCompetitive ? const_GameModeWingman : const_GameModeCompetitive;
+  SetConVarInt(gameModeCvar,newGameMode);
+  return newGameMode;
+}
+
 stock bool IsTVEnabled() {
   Handle tvEnabledCvar = FindConVar("tv_enable");
   if (tvEnabledCvar == INVALID_HANDLE) {
@@ -386,6 +401,13 @@ stock void ReplaceStringWithInt(char[] buffer, int len, const char[] replace, in
   char intString[MAX_INTEGER_STRING_LENGTH];
   IntToString(value, intString, sizeof(intString));
   ReplaceString(buffer, len, replace, intString, caseSensitive);
+}
+
+stock void ReplaceStringWithFloat(char[] buffer, int len, const char[] replace, float value,
+                                bool caseSensitive = false) {
+  char floatString[MAX_INTEGER_STRING_LENGTH];
+  FloatToString(value, floatString, sizeof(floatString));
+  ReplaceString(buffer, len, replace, floatString, caseSensitive);
 }
 
 stock void ReplaceStringWithColoredInt(char[] buffer, int len, const char[] replace, int value,

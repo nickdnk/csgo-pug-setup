@@ -1,8 +1,8 @@
 #define KNIFE_CONFIG "sourcemod/pugsetup/knife.cfg"
 Handle g_KnifeCvarRestore = INVALID_HANDLE;
 
-public Action StartKnifeRound(Handle timer) {
-  if (g_GameState != GameState_KnifeRound)
+public Action StartSidesRound(SidesRound sidesRound) {
+  if (g_GameState != GameState_SidesRound)
     return Plugin_Handled;
 
   // reset player tags
@@ -12,74 +12,129 @@ public Action StartKnifeRound(Handle timer) {
     }
   }
 
+  Unpause();
+
   g_KnifeCvarRestore = ExecuteAndSaveCvars(KNIFE_CONFIG);
   if (g_KnifeCvarRestore == INVALID_HANDLE) {
     LogError("Failed to save cvar values when executing %s", KNIFE_CONFIG);
   }
 
-  RestartGame(1);
-  g_KnifeNumVotesNeeded = g_PlayersPerTeam / 2 + 1;
-  for (int i = 1; i <= MaxClients; i++) {
-    g_KnifeRoundVotes[i] = KnifeDecision_None;
+  if (sidesRound == SidesRound_Deagle) {
+    ServerCommand("mp_t_default_secondary weapon_deagle;mp_ct_default_secondary weapon_deagle");
+  } else if (sidesRound == SidesRound_Scout) {
+    ServerCommand("mp_ct_default_primary weapon_ssg08;mp_t_default_primary weapon_ssg08");
+  } else if (sidesRound == SidesRound_Grenades) {
+    ServerCommand("ammo_grenade_limit_default 4;sv_maxspeed 190");
   }
 
-  // This is done on a delay since the cvar changes from
-  // the knife cfg execute have their own delay of when they are printed
-  // into global chat.
+  RestartGame(1);
+
+  // Reset sides votes
+  g_SidesNumVotesNeeded = g_PlayersPerTeam / 2 + 1;
+  for (int i = 1; i <= MaxClients; i++) {
+    g_SidesRoundVotes[i] = SidesDecision_None;
+  }
+
+  g_SidesMessageCount = 9;
+
+  CreateTimer(1.0, Timer_SidesKnifeText, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
   CreateTimer(1.0, Timer_AnnounceKnife);
+ 
   return Plugin_Handled;
 }
 
 public Action Timer_AnnounceKnife(Handle timer) {
-  if (g_GameState != GameState_KnifeRound)
+  if (g_GameState != GameState_SidesRound) {
     return Plugin_Handled;
+  }
 
-  for (int i = 0; i < 5; i++)
-    PugSetup_MessageToAll("%t", "KnifeRound");
+  for (int i = 0; i < 3; i++) {
+    PugSetup_MessageToAll("%t", "SidesRound");
+  }
+    
   return Plugin_Handled;
+
 }
 
-public Action Timer_HandleKnifeDecisionVote(Handle timer) {
-  HandleKnifeDecisionVote(true);
+public Action Timer_SidesKnifeText(Handle timer) {
+  if (g_GameState != GameState_SidesRound) {
+    return Plugin_Stop;
+  }
+
+  if (g_SidesMessageCount == 0) {
+    return Plugin_Stop;
+  }
+
+  if (g_SidesRound == SidesRound_Deagle) {
+      PrintHintTextToAll("%t", "StartSidesRoundDeagle");
+  } else if (g_SidesRound == SidesRound_Knife) {
+      PrintHintTextToAll("%t", "StartSidesRoundKnife");
+  } else if (g_SidesRound == SidesRound_Scout) {
+      PrintHintTextToAll("%t", "StartSidesRoundScout");
+  } else if (g_SidesRound == SidesRound_Grenades) {
+      PrintHintTextToAll("%t", "StartSidesRoundGrenades");
+  } else {
+    return Plugin_Stop;
+  }
+
+  g_SidesMessageCount--;
+  
+  return Plugin_Continue;
 }
 
-static void HandleKnifeDecisionVote(bool timeExpired = false) {
-  if (g_GameState != GameState_WaitingForKnifeRoundDecision) {
+public Action Timer_HandleSidesDecisionVote(Handle timer) {
+  HandleSidesDecisionVote(true);
+}
+
+static void HandleSidesDecisionVote(bool timeExpired = false) {
+  if (g_GameState != GameState_WaitingForSidesRoundDecision) {
     return;
   }
 
   int stayCount = 0;
   int swapCount = 0;
-  CountKnifeVotes(stayCount, swapCount);
-  if (stayCount >= g_KnifeNumVotesNeeded) {
-    EndKnifeRound(false);
-  } else if (swapCount >= g_KnifeNumVotesNeeded) {
-    EndKnifeRound(true);
+  CountSideVotes(stayCount, swapCount);
+  if (stayCount >= g_SidesNumVotesNeeded) {
+    EndSidesRound(false);
+  } else if (swapCount >= g_SidesNumVotesNeeded) {
+    EndSidesRound(true);
   } else if (timeExpired) {
-    EndKnifeRound(swapCount > stayCount);
+    EndSidesRound(swapCount > stayCount);
   }
 }
 
-public void CountKnifeVotes(int& stayCount, int& swapCount) {
+public void CountSideVotes(int& stayCount, int& swapCount) {
   for (int i = 1; i <= MaxClients; i++) {
-    if (IsValidClient(i) && GetClientTeam(i) == g_KnifeWinner) {
-      if (g_KnifeRoundVotes[i] == KnifeDecision_Stay) {
+    if (IsValidClient(i) && GetClientTeam(i) == g_SidesWinner) {
+      if (g_SidesRoundVotes[i] == SidesDecision_Stay) {
         stayCount++;
-      } else if (g_KnifeRoundVotes[i] == KnifeDecision_Swap) {
+      } else if (g_SidesRoundVotes[i] == SidesDecision_Swap) {
         swapCount++;
       }
     }
   }
-  LogDebug("CountKnifeVotes stayCount=%d, swapCount=%d", stayCount, swapCount);
+  LogDebug("CountSideVotes stayCount=%d, swapCount=%d", stayCount, swapCount);
 }
 
-public void EndKnifeRound(bool swap) {
-  LogDebug("EndKnifeRound swap=%d", swap);
+public void EndSidesRound(bool swap) {
+  LogDebug("EndSidesRound swap=%d", swap);
   Call_StartForward(g_hOnKnifeRoundDecision);
   Call_PushCell(swap);
   Call_Finish();
 
   if (swap) {
+
+    char teamName1[PLATFORM_MAX_PATH];
+    char teamName2[PLATFORM_MAX_PATH];
+
+    GetConVarString(g_TeamName1Cvar, teamName1, PLATFORM_MAX_PATH);
+    GetConVarString(g_TeamName2Cvar, teamName2, PLATFORM_MAX_PATH);
+
+    if (strlen(teamName1) > 0 && strlen(teamName2) > 0) {
+      SetTeamInfo(CS_TEAM_T, teamName1, "");
+      SetTeamInfo(CS_TEAM_CT, teamName2, "");
+    }
+
     for (int i = 1; i <= MaxClients; i++) {
       if (IsValidClient(i)) {
         int team = GetClientTeam(i);
@@ -87,7 +142,6 @@ public void EndKnifeRound(bool swap) {
           SwitchPlayerTeam(i, CS_TEAM_CT);
         } else if (team == CS_TEAM_CT) {
           SwitchPlayerTeam(i, CS_TEAM_T);
-
         } else if (IsClientCoaching(i)) {
           team = GetCoachTeam(i);
           if (team == CS_TEAM_T) {
@@ -100,27 +154,28 @@ public void EndKnifeRound(bool swap) {
     }
   }
 
-  ChangeState(GameState_GoingLive);
   if (g_KnifeCvarRestore != INVALID_HANDLE) {
     RestoreCvars(g_KnifeCvarRestore);
     CloseCvarStorage(g_KnifeCvarRestore);
     g_KnifeCvarRestore = INVALID_HANDLE;
   }
-  CreateTimer(3.0, BeginLO3, _, TIMER_FLAG_NO_MAPCHANGE);
+
+  StartCountDown();
+
 }
 
 static bool AwaitingDecision(int client, const char[] command) {
-  if (g_DoVoteForKnifeRoundDecisionCvar.IntValue != 0) {
-    return (g_GameState == GameState_WaitingForKnifeRoundDecision) && IsPlayer(client) &&
-           GetClientTeam(client) == g_KnifeWinner;
+  if (g_DoVoteForSidesRoundDecisionCvar.IntValue != 0) {
+    return (g_GameState == GameState_WaitingForSidesRoundDecision) && IsPlayer(client) &&
+           GetClientTeam(client) == g_SidesWinner;
   } else {
     // Always lets console make the decision
     if (client == 0)
       return true;
 
     // Check if they're on the winning team
-    bool canMakeDecision = (g_GameState == GameState_WaitingForKnifeRoundDecision) &&
-                           IsPlayer(client) && GetClientTeam(client) == g_KnifeWinner;
+    bool canMakeDecision = (g_GameState == GameState_WaitingForSidesRoundDecision) &&
+                           IsPlayer(client) && GetClientTeam(client) == g_SidesWinner;
     bool hasPermissions = DoPermissionCheck(client, command);
     LogDebug("Knife AwaitingDecision Vote: client=%L canMakeDecision=%d, hasPermissions=%d", client,
              canMakeDecision, hasPermissions);
@@ -130,12 +185,12 @@ static bool AwaitingDecision(int client, const char[] command) {
 
 public Action Command_Stay(int client, int args) {
   if (AwaitingDecision(client, "sm_stay")) {
-    if (g_DoVoteForKnifeRoundDecisionCvar.IntValue == 0) {
-      EndKnifeRound(false);
+    if (g_DoVoteForSidesRoundDecisionCvar.IntValue == 0) {
+      EndSidesRound(false);
     } else {
-      g_KnifeRoundVotes[client] = KnifeDecision_Stay;
+      g_SidesRoundVotes[client] = SidesDecision_Stay;
       PugSetup_Message(client, "%t", "KnifeRoundVoteStay");
-      HandleKnifeDecisionVote();
+      HandleSidesDecisionVote();
     }
   }
   return Plugin_Handled;
@@ -143,12 +198,12 @@ public Action Command_Stay(int client, int args) {
 
 public Action Command_Swap(int client, int args) {
   if (AwaitingDecision(client, "sm_swap")) {
-    if (g_DoVoteForKnifeRoundDecisionCvar.IntValue == 0) {
-      EndKnifeRound(true);
+    if (g_DoVoteForSidesRoundDecisionCvar.IntValue == 0) {
+      EndSidesRound(true);
     } else {
-      g_KnifeRoundVotes[client] = KnifeDecision_Swap;
+      g_SidesRoundVotes[client] = SidesDecision_Swap;
       PugSetup_Message(client, "%t", "KnifeRoundVoteSwap");
-      HandleKnifeDecisionVote();
+      HandleSidesDecisionVote();
     }
   }
   return Plugin_Handled;
@@ -174,11 +229,11 @@ public Action Command_T(int client, int args) {
   return Plugin_Handled;
 }
 
-public int GetKnifeRoundWinner() {
+public int GetSidesRoundWinner() {
   int ctAlive = CountAlivePlayersOnTeam(CS_TEAM_CT);
   int tAlive = CountAlivePlayersOnTeam(CS_TEAM_T);
   int winningCSTeam = CS_TEAM_NONE;
-  LogDebug("GetKnifeRoundWinner: ctAlive=%d, tAlive=%d", ctAlive, tAlive);
+  LogDebug("GetSidesRoundWinner: ctAlive=%d, tAlive=%d", ctAlive, tAlive);
   if (ctAlive > tAlive) {
     winningCSTeam = CS_TEAM_CT;
   } else if (tAlive > ctAlive) {
@@ -186,13 +241,13 @@ public int GetKnifeRoundWinner() {
   } else {
     int ctHealth = SumHealthOfTeam(CS_TEAM_CT);
     int tHealth = SumHealthOfTeam(CS_TEAM_T);
-    LogDebug("GetKnifeRoundWinner: ctHealth=%d, tHealth=%d", ctHealth, tHealth);
+    LogDebug("GetSidesRoundWinner: ctHealth=%d, tHealth=%d", ctHealth, tHealth);
     if (ctHealth > tHealth) {
       winningCSTeam = CS_TEAM_CT;
     } else if (tHealth > ctHealth) {
       winningCSTeam = CS_TEAM_T;
     } else {
-      LogDebug("GetKnifeRoundWinner: Falling to random knife winner");
+      LogDebug("GetSidesRoundWinner: Falling to random knife winner");
       if (GetRandomFloat(0.0, 1.0) < 0.5) {
         winningCSTeam = CS_TEAM_CT;
       } else {
