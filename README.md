@@ -23,25 +23,15 @@ I made the following changes:
 
 **Changing the source code**
 
-1. You cannot compile the original version of this project without SourceMod. Download here:
-    - SourceMod: https://www.sourcemod.net/downloads.php?branch=stable
-    - And MetaMod as well: https://www.sourcemm.net/downloads.php?branch=stable
-2. Unpack the `addons` folder to the root of this project. It's already part of `.gitignore`
-3. Copy all files inside `scripting` to `addons/sourcemod/scripting`
-4. cd into the above folder, run `chmod +x spcomp` and run:
-
-`spcomp pugsetup.sp`
-`spcomp pugsetup_damageprint.sp`
-
-... and so on. Outputs `.smx` files. Those files need to reside in the `plugins` folder (next to `scripting`) on the production system. Move them there now.
-
-5. Copy the `configs/pugsetup` folder to `addons/sourcemod/configs/pugsetup`
-6. Copy the `translations` folder to `addons/sourcemod/translations`
-7. Unpack the downloaded MetaMod into `addons/metamod`
-8. Now we can merge the "result" with the `csgo` folder on the server:
-9. Copy the entire `addons` into `csgo/addons` (create if not present) folder on the production system.
-10. Copy `cfg` to `csgo/cfg`.
-11. Profit. Repeat from step 3 if making any changes.
+1. Download SourceMod:
+    - https://www.sourcemod.net/downloads.php?branch=stable
+2. Unpack the `addons` folder to the root of this project. It's already part of `.gitignore` and its contents should not be edited except if updating SourceMod/MetaMod.
+3. Run `compile.sh` from the root of the project.
+4. Download MetaMod:
+    - https://www.sourcemm.net/downloads.php?branch=stable
+4. Unpack MetaMod into `addons/metamod` (merge it).
+5. Copy `addons` to `csgo/addons` and `cfg` to `csgo/cfg` on the server.
+6. Profit. Repeat from step 3 if making any changes (or step 2 if updating mods).
 ### ORIGINAL README STARTS HERE:
 
 [![Build status](http://ci.splewis.net/job/csgo-pug-setup/badge/icon)](http://ci.splewis.net/job/csgo-pug-setup/)

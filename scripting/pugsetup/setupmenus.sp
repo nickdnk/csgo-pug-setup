@@ -214,7 +214,6 @@ public int SetupMenuHandler(Menu menu, MenuAction action, int param1, int param2
     } else if (StrEqual(buffer, "game_mode")) {
       int newGameMode = ToggleGameMode();
       g_PlayersPerTeam = newGameMode == const_GameModeWingman ? 2 : 5;
-      g_TeamType = newGameMode == const_GameModeWingman ? TeamType_Manual : TeamType_Captains;
       PugSetup_MessageToAll("%t", "ChangeGameMode", newGameMode == const_GameModeWingman ? "Wingman (2v2)" : "Competitive (5v5)");
       CreateTimer(3.0, Timer_ChangeGameMode, _, TIMER_FLAG_NO_MAPCHANGE);
     }

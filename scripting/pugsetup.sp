@@ -88,8 +88,8 @@ MapType g_MapType = MapType_Vote;
 bool g_RecordGameOption = false;
 SidesRound g_SidesRound = SidesRound_None;
 bool g_AutoLive = true;
-bool g_FriendlyFire = true;
 bool g_DoAimWarmup = false;
+bool g_FriendlyFire = true;
 bool g_DoPlayout = false;
 
 /** Other important variables about the state of the game **/
