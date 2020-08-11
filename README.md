@@ -23,27 +23,25 @@ I made the following changes:
 
 **Changing the source code**
 
-1. You cannot compile the original version of this project without 2 other components:
+1. You cannot compile the original version of this project without SourceMod. Download here:
     - SourceMod: https://www.sourcemod.net/downloads.php?branch=stable
-    - MetaMod: https://www.sourcemm.net/downloads.php?branch=stable
-    - SteamWorks for SourcePawn: http://users.alliedmods.net/~kyles/builds/SteamWorks/
-
-Versions in repo:
-    - SourceMod: 1.10.0 git6492
-    - SteamWorks for SourcePawn: git132
-    - MetaMod: 1.10.7 git 971
-
-In this fork, all of these files have been committed to the repo so it *should* be drag and drop. To update the above components all we need to do is to merge them with new downloads again, replacing any existing files. However, I know *this* particular combination (of SourceMod + Steamworks in this repo) works, so I'll save the "dependencies" in a known state as I have no idea how to package manage this.
-
-If you made changes to the files inside the `sourcemod/scripting` folder, you must compile them with spcomp, which is inside that folder as well.
+    - And MetaMod as well: https://www.sourcemm.net/downloads.php?branch=stable
+2. Unpack the `addons` folder to the root of this project. It's already part of `.gitignore`
+3. Copy all files inside `scripting` to `addons/sourcemod/scripting`
+4. cd into the above folder, run `chmod +x spcomp` and run:
 
 `spcomp pugsetup.sp`
 `spcomp pugsetup_damageprint.sp`
 
-... and so on. Outputs `.smx` files. Move those to the `sourcemod/plugins` folder.
+... and so on. Outputs `.smx` files. Those files need to reside in the `plugins` folder (next to `scripting`) on the production system. Move them there now.
 
-2. This project has a 1:1 "production ready" structure making it mergeable with the contents of the `csgo` folder on a server or for the game. Once step 1 is complete (for no changes/update just download this repo and do only this step), just copy/move the entire folder structure inside the `csgo` folder, merging it with the existing folder structure. If you already have sourcemod/metamod then this will "update" those. Note that this also resets the admin configs, so you may want to back up your own version of `addons/sourcemod/configs/admins_simple.ini` (or other admin files) if you made changes to them.
-
+5. Copy the `configs/pugsetup` folder to `addons/sourcemod/configs/pugsetup`
+6. Copy the `translations` folder to `addons/sourcemod/translations`
+7. Unpack the downloaded MetaMod into `addons/metamod`
+8. Now we can merge the "result" with the `csgo` folder on the server:
+9. Copy the entire `addons` into `csgo/addons` (create if not present) folder on the production system.
+10. Copy `cfg` to `csgo/cfg`.
+11. Profit. Repeat from step 3 if making any changes.
 ### ORIGINAL README STARTS HERE:
 
 [![Build status](http://ci.splewis.net/job/csgo-pug-setup/badge/icon)](http://ci.splewis.net/job/csgo-pug-setup/)
