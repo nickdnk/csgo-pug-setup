@@ -257,7 +257,8 @@ stock void ReadSetupOptions() {
         g_DisplayFriendlyFire = display;
 
       } else if (StrEqual(setting, "teamsize", false)) {
-        g_PlayersPerTeam = GetGameMode() == const_GameModeWingman ? 2 : 5; // default players to 5 for 5v5 and 2 for wingman depending on game mode
+        kv.GetString("default", buffer, sizeof(buffer), "5");
+        g_PlayersPerTeam = StringToInt(buffer);
         g_DisplayTeamSize = display;
 
       } else if (StrEqual(setting, "record", false)) {
